@@ -1,0 +1,68 @@
+#!/bin/bash
+# SwarmFish Setup - Install optional dependencies
+set -euo pipefail
+
+echo "SwarmFish — Dependency Setup"
+echo "============================"
+echo ""
+
+INSTALL_GRAPHVIZ=false
+INSTALL_NETWORKX=false
+
+# Check what's missing
+if ! command -v dot &>/dev/null; then
+  echo "[!] graphviz not found (enables force-directed SVG graph layouts)"
+  INSTALL_GRAPHVIZ=true
+else
+  echo "[✓] graphviz $(dot -V 2>&1 | grep -oP '[\d.]+')"
+fi
+
+if ! python3 -c "import networkx" 2>/dev/null; then
+  echo "[!] networkx not found (enables PageRank, centrality, community detection)"
+  INSTALL_NETWORKX=true
+else
+  echo "[✓] networkx $(python3 -c 'import networkx; print(networkx.__version__)')"
+fi
+
+# Check already-present tools
+command -v jq &>/dev/null && echo "[✓] jq $(jq --version 2>&1)" || echo "[!] jq not found (required for /swarmfish:swarm query)"
+command -v mmdc &>/dev/null && echo "[✓] mermaid-cli (fallback graph renderer)" || echo "[·] mermaid-cli not found (optional)"
+command -v md-to-pdf &>/dev/null && echo "[✓] md-to-pdf (PDF export)" || echo "[·] md-to-pdf not found (optional: npm i -g md-to-pdf)"
+python3 -c "import rich" 2>/dev/null && echo "[✓] rich (pretty terminal output)" || echo "[·] rich not found (optional: pip install rich)"
+
+echo ""
+
+# Install missing optional tools
+if $INSTALL_GRAPHVIZ || $INSTALL_NETWORKX; then
+  echo "Install missing optional tools? (y/n)"
+  read -r REPLY
+  if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+    if $INSTALL_GRAPHVIZ; then
+      echo "Installing graphviz..."
+      if command -v brew &>/dev/null; then
+        brew install graphviz
+      elif command -v apt-get &>/dev/null; then
+        sudo apt-get install -y graphviz
+      elif command -v dnf &>/dev/null; then
+        sudo dnf install -y graphviz
+      else
+        echo "Please install graphviz manually for your OS"
+      fi
+    fi
+
+    if $INSTALL_NETWORKX; then
+      echo "Installing networkx + numpy..."
+      pip3 install networkx numpy 2>/dev/null || \
+      pip3 install --user networkx numpy 2>/dev/null || \
+      pip3 install --break-system-packages networkx numpy 2>/dev/null || \
+      echo "Please install manually: pip install networkx numpy"
+    fi
+
+    echo ""
+    echo "Setup complete. Run /swarmfish:swarm check to verify."
+  else
+    echo "Skipped. You can install later with: /swarmfish:swarm setup"
+  fi
+else
+  echo "All optional tools already installed!"
+fi

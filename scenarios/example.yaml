@@ -1,0 +1,86 @@
+# ============================================================
+# Example Scenario: Tech Company IPO Impact
+# ============================================================
+# This is a template showing how to define a simulation scenario.
+# Copy this file and modify for your own predictions.
+# ============================================================
+
+name: "Tech Company IPO Impact"
+description: |
+  Simulate how different stakeholders react to a major AI company
+  announcing its IPO, and predict market and public opinion outcomes.
+
+# ── Seed Content ─────────────────────────────────────────────
+# The initial information that seeds the simulation.
+# Can be inline text, or a path to a file.
+seed:
+  type: "text"                      # "text" | "file" | "url"
+  content: |
+    Breaking: Anthropic announces plans for an IPO in Q3 2026,
+    seeking a $100B valuation. The company, known for its Claude AI
+    model, has been growing rapidly in the enterprise market.
+
+    Key details:
+    - Expected valuation: $100B
+    - Lead underwriters: Goldman Sachs and Morgan Stanley
+    - Revenue reported at $4B annually
+    - Major customers include Fortune 500 companies
+    - Competitors OpenAI and Google DeepMind are watching closely
+    - AI regulation debates intensifying in Congress
+    - EU AI Act implementation in progress
+
+  # For file-based seeds:
+  # type: "file"
+  # path: "./seeds/my-document.txt"
+
+# ── Prediction Question ──────────────────────────────────────
+# What do you want the simulation to predict?
+prediction_question: |
+  How will different stakeholders (investors, competitors, regulators,
+  employees, public) react to this IPO announcement? What will be
+  the likely market impact and public opinion trajectory over the
+  next 30 days?
+
+# ── Scenario Overrides ───────────────────────────────────────
+# Override global config.yaml settings for this scenario
+overrides:
+  simulation:
+    max_rounds: 8
+    max_agents: 12
+  report:
+    style: "executive"
+
+# ── Pre-defined Interventions ────────────────────────────────
+# Events to inject at specific rounds to test reactions
+interventions:
+  - round: 3
+    event: |
+      Breaking: A major data breach affecting 10M users is reported
+      at a competing AI company, raising questions about AI safety
+      across the industry.
+  - round: 6
+    event: |
+      Congress introduces a bill requiring AI companies to undergo
+      mandatory safety audits before going public.
+
+# ── Custom Entity Hints ──────────────────────────────────────
+# Optional: hint at entities you want the extractor to find
+# The system will still discover others automatically
+entity_hints:
+  - name: "Anthropic"
+    type: "organization"
+    importance: "high"
+  - name: "SEC"
+    type: "government"
+    importance: "medium"
+  - name: "Retail Investors"
+    type: "group"
+    importance: "medium"
+
+# ── Success Criteria ─────────────────────────────────────────
+# Optional: define what a successful simulation looks like
+success_criteria:
+  - "Agents from at least 4 different entity types participated"
+  - "Clear opinion divergence emerged between stakeholder groups"
+  - "At least 2 prediction trends can be identified"
+  - "Intervention events caused measurable sentiment shifts"

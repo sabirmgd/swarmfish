@@ -1,0 +1,20 @@
+#!/bin/bash
+# SwarmFish Dependency Check
+echo "SwarmFish — Dependency Check"
+echo ""
+echo "REQUIRED:"
+printf "  jq .............. " && (command -v jq &>/dev/null && echo "$(jq --version 2>&1) ✓" || echo "NOT FOUND ✗")
+printf "  python3 ......... " && (command -v python3 &>/dev/null && echo "$(python3 --version 2>&1) ✓" || echo "NOT FOUND ✗")
+echo ""
+echo "VISUALIZATION:"
+printf "  graphviz ........ " && (command -v dot &>/dev/null && echo "$(dot -V 2>&1 | head -1) ✓" || echo "not installed (brew install graphviz)")
+printf "  mermaid-cli ..... " && (command -v mmdc &>/dev/null && echo "$(mmdc --version 2>&1 | head -1) ✓" || echo "not installed (npm i -g @mermaid-js/mermaid-cli)")
+echo ""
+echo "ANALYSIS:"
+printf "  networkx ........ " && (python3 -c "import networkx; print(f'{networkx.__version__} ✓')" 2>/dev/null || echo "not installed (pip install networkx numpy)")
+echo ""
+echo "PDF EXPORT:"
+printf "  md-to-pdf ....... " && (command -v md-to-pdf &>/dev/null && echo "installed ✓" || echo "not installed (npm i -g md-to-pdf)")
+echo ""
+echo "TERMINAL:"
+printf "  rich ............ " && (python3 -c "import rich; print('installed ✓')" 2>/dev/null || echo "not installed (pip install rich)")

@@ -1,0 +1,220 @@
+# ============================================================
+# SwarmFish Configuration
+# A multi-agent swarm intelligence engine for Claude Code
+# ============================================================
+# Inspired by MiroFish - adapted for file-based orchestration
+# Edit this file to customize behavior across all simulations
+# ============================================================
+
+version: "1.0"
+
+# ── Model Configuration ──────────────────────────────────────
+# Which model to use for each phase of the simulation.
+# Options: "opus", "sonnet", "haiku"
+# - opus:   Highest quality, best for synthesis and complex reasoning
+# - sonnet: Good balance of speed and quality
+# - haiku:  Fastest, best for high-volume agent turns
+models:
+  ontology_generation: "sonnet"     # Generating entity/relationship types from seed
+  entity_extraction: "sonnet"       # Extracting entities from seed documents
+  persona_generation: "sonnet"      # Creating detailed agent personas
+  simulation: "haiku"               # Individual agent actions each round
+  round_summary: "sonnet"           # Summarizing what happened each round
+  memory_update: "haiku"            # Converting actions to graph memory updates
+  graph_search: "sonnet"            # Semantic search over the knowledge graph
+  report: "opus"                    # Final prediction report synthesis
+  interaction: "sonnet"             # Interactive chat with agents
+
+# ── Knowledge Graph Settings ─────────────────────────────────
+# The graph is our file-based replacement for Zep Cloud.
+# All graph data lives in .swarm/simulations/{id}/graph/
+graph:
+  # How to chunk the seed document for processing
+  chunk_size: 500                   # Characters per chunk
+  chunk_overlap: 50                 # Overlap between chunks
+
+  # Entity extraction
+  max_entity_types: 10              # Max distinct entity types to discover
+  max_relationship_types: 10        # Max distinct relationship types
+  enrich_with_relationships: true   # Pull related entities for each node
+
+  # Memory evolution during simulation
+  update_after_each_round: true     # Write agent actions back to graph
+  track_temporal_changes: true      # Track when facts become valid/invalid
+  max_episodes_per_update: 10       # Batch size for memory updates
+
+  # Search configuration (used by report agent)
+  search:
+    max_results: 20                 # Max results per search query
+    include_expired: true           # Include historical/expired facts
+    decompose_queries: true         # Break complex queries into sub-queries
+
+# ── Simulation Settings ──────────────────────────────────────
+simulation:
+  max_rounds: 10                    # Maximum simulation rounds to run
+  agents_per_round: "all"           # "all" or integer (how many agents act per round)
+  min_agents: 3                     # Minimum agents to generate from seed
+  max_agents: 15                    # Maximum agents to generate from seed
+  parallel_agents: 3                # How many agent turns to run in parallel per round
+  round_duration_minutes: 30        # Simulated time per round (for narrative)
+  cooldown_between_rounds: false    # Pause between rounds for user review
+
+# ── Activity Scheduling ──────────────────────────────────────
+activity:
+  peak_hours: [9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21]
+  off_peak_hours: [0, 1, 2, 3, 4, 5]
+  peak_multiplier: 1.0
+  off_peak_multiplier: 0.2
+  normal_multiplier: 0.6
+
+# ── Platform Configuration ───────────────────────────────────
+# Define the simulated platforms where agents interact.
+# MiroFish uses Twitter + Reddit. You can define anything.
+platforms:
+  - name: "forum"
+    description: "Public discussion forum where agents post threads and reply"
+    actions:
+      - type: "post"
+        description: "Create a new discussion thread"
+        weight: 0.2
+      - type: "reply"
+        description: "Reply to an existing thread or comment"
+        weight: 0.35
+      - type: "react"
+        description: "React to a post (agree, disagree, like, dislike)"
+        weight: 0.25
+      - type: "share"
+        description: "Share/amplify someone else's post with commentary"
+        weight: 0.1
+      - type: "dm"
+        description: "Send a private message to another agent"
+        weight: 0.1
+
+  # Uncomment to add a news platform:
+  # - name: "news"
+  #   description: "News outlet where media agents publish articles"
+  #   actions:
+  #     - type: "publish"
+  #       description: "Publish a news article or opinion piece"
+  #       weight: 0.15
+  #     - type: "comment"
+  #       description: "Comment on a published article"
+  #       weight: 0.4
+  #     - type: "react"
+  #       description: "React to an article or comment"
+  #       weight: 0.3
+  #     - type: "cite"
+  #       description: "Reference/cite another article in your writing"
+  #       weight: 0.15
+
+# ── Entity Types ─────────────────────────────────────────────
+# Base types. The ontology generator may add scenario-specific ones.
+entity_types:
+  - name: "person"
+    description: "Individual human actors"
+    can_act: true
+    color: "#4A90D9"
+  - name: "organization"
+    description: "Companies, NGOs, institutions"
+    can_act: true
+    color: "#7B68EE"
+  - name: "government"
+    description: "Government bodies, regulators"
+    can_act: true
+    color: "#E74C3C"
+  - name: "media"
+    description: "News outlets, journalists"
+    can_act: true
+    color: "#F39C12"
+  - name: "group"
+    description: "Informal groups, movements, communities"
+    can_act: true
+    color: "#2ECC71"
+  - name: "concept"
+    description: "Key ideas, policies, technologies (context only)"
+    can_act: false
+    color: "#95A5A6"
+  - name: "event"
+    description: "Events that shape the scenario (context only)"
+    can_act: false
+    color: "#BDC3C7"
+
+# ── Relationship Types ───────────────────────────────────────
+relationship_types:
+  - name: "SUPPORTS"
+    description: "Supports/endorses another entity or position"
+    color: "#2ECC71"
+  - name: "OPPOSES"
+    description: "Opposes/criticizes another entity or position"
+    color: "#E74C3C"
+  - name: "WORKS_FOR"
+    description: "Employment or affiliation"
+    color: "#3498DB"
+  - name: "COLLABORATES_WITH"
+    description: "Working together"
+    color: "#9B59B6"
+  - name: "INFLUENCES"
+    description: "Has influence over another"
+    color: "#F39C12"
+  - name: "REPORTS_ON"
+    description: "Media covers/reports on"
+    color: "#E67E22"
+  - name: "REGULATES"
+    description: "Government regulates"
+    color: "#C0392B"
+  - name: "COMPETES_WITH"
+    description: "In competition"
+    color: "#E74C3C"
+
+# ── Persona Generation ───────────────────────────────────────
+persona:
+  include_mbti: true
+  include_age: true
+  include_background: true
+  include_communication_style: true
+  include_biases: true
+  include_goals: true
+  activity_level_range: [0.1, 1.0]
+
+# ── Report Configuration ─────────────────────────────────────
+report:
+  max_sections: 5
+  style: "analytical"               # analytical | narrative | executive | academic
+  include_agent_quotes: true
+  include_timeline: true
+  include_sentiment_analysis: true
+  include_predictions: true
+  include_confidence_levels: true
+  # Report agent tools (like MiroFish's InsightForge/PanoramaSearch)
+  tools:
+    insight_forge: true             # Deep multi-query analysis over graph
+    panorama_search: true           # Full graph dump with temporal data
+    quick_search: true              # Simple keyword/entity lookup
+    interview_agents: true          # Ask agents questions during report gen
+
+# ── Dashboard / Visualization ────────────────────────────────
+dashboard:
+  enabled: true                     # Generate HTML dashboard after simulation
+  auto_open: true                   # Auto-open in browser after generation
+  theme: "dark"                     # dark | light
+  graph_layout: "force"             # force | hierarchical | circular
+  include_tabs:
+    - "graph"                       # Entity relationship graph (D3.js force-directed)
+    - "simulation"                  # Round-by-round action timeline
+    - "agents"                      # Agent persona cards with stats
+    - "sentiment"                   # Sentiment evolution charts
+    - "report"                      # Rendered prediction report
+    - "chat"                        # Chat history viewer
+
+# ── Output Configuration ─────────────────────────────────────
+output:
+  format: "markdown"
+  save_actions: true
+  save_round_summaries: true
+  save_entity_graph: true
+  verbose_logging: false
+
+# ── God's Eye Interventions ──────────────────────────────────
+interventions:
+  enabled: true
+  pause_for_intervention: true

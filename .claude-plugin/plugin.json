@@ -1,0 +1,33 @@
+{
+  "name": "swarmfish",
+  "version": "0.1.0",
+  "description": "Multi-agent swarm intelligence engine. Simulate how diverse stakeholders react to scenarios and predict outcomes using knowledge graphs, agent personas, and interactive dashboards.",
+  "author": {
+    "name": "Sabir Salah",
+    "url": "https://github.com/sabirsalah"
+  },
+  "homepage": "https://github.com/sabirsalah/swarmfish",
+  "repository": "https://github.com/sabirsalah/swarmfish",
+  "license": "MIT",
+  "keywords": [
+    "swarm-intelligence",
+    "multi-agent",
+    "simulation",
+    "prediction",
+    "knowledge-graph",
+    "agent-teams"
+  ],
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "userConfig": {
+    "default_sim_model": {
+      "description": "Default model for simulation agent turns (opus, sonnet, haiku)"
+    },
+    "default_report_model": {
+      "description": "Default model for report generation (opus, sonnet, haiku)"
+    },
+    "auto_open_dashboard": {
+      "description": "Automatically open dashboard in browser after generation (true/false)"
+    }
+  }
+}

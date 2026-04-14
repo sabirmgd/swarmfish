@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwarmFish — {{scenario_name}}</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --bg-card: #1c2128;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --radius: 8px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .header-brand h1 { font-size: 18px; font-weight: 600; }
+  .header-brand span { color: var(--accent); font-size: 20px; }
+  .header-meta { display: flex; gap: 20px; font-size: 13px; color: var(--text-secondary); }
+  .header-meta .stat { display: flex; align-items: center; gap: 4px; }
+  .header-meta .stat strong { color: var(--text-primary); }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex; gap: 0;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 20px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ── Content ── */
+  .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .card-title { font-size: 16px; font-weight: 600; }
+  .card-subtitle { font-size: 13px; color: var(--text-secondary); }
+
+  /* ── Graph Tab ── */
+  #graph-container {
+    width: 100%; height: 600px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+  }
+  #graph-container svg { width: 100%; height: 100%; }
+  .graph-legend {
+    position: absolute; bottom: 16px; left: 16px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    background: rgba(13,17,23,0.85);
+    padding: 8px 12px; border-radius: 6px;
+    font-size: 12px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .node-tooltip {
+    position: absolute; display: none;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px;
+    font-size: 13px; max-width: 300px;
+    pointer-events: none; z-index: 50;
+    box-shadow: var(--shadow);
+  }
+  .node-tooltip h4 { margin-bottom: 4px; color: var(--accent); }
+  .node-tooltip .type-badge {
+    display: inline-block; font-size: 11px;
+    padding: 1px 6px; border-radius: 4px;
+    background: var(--bg-primary); color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  /* ── Simulation Timeline ── */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before {
+    content: ''; position: absolute; left: 15px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+  }
+  .timeline-round {
+    position: relative; margin-bottom: 24px;
+  }
+  .timeline-round::before {
+    content: ''; position: absolute; left: -24px; top: 6px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg-primary);
+    z-index: 1;
+  }
+  .round-header {
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .round-actions { display: flex; flex-direction: column; gap: 8px; }
+  .action-card {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .action-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; flex-shrink: 0;
+    color: #fff;
+  }
+  .action-body { flex: 1; min-width: 0; }
+  .action-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 2px; }
+  .action-agent { font-weight: 600; }
+  .action-type {
+    font-size: 11px; padding: 1px 6px; border-radius: 4px;
+    background: var(--bg-tertiary); color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .action-content { color: var(--text-secondary); word-break: break-word; }
+  .action-target { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-style: italic; }
+
+  /* ── Agent Cards ── */
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .agent-card { padding: 20px; }
+  .agent-header { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+  .agent-avatar-lg {
+    width: 48px; height: 48px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600; color: #fff;
+  }
+  .agent-name { font-weight: 600; font-size: 15px; }
+  .agent-type-badge {
+    display: inline-block; font-size: 11px;
+    padding: 2px 8px; border-radius: 4px;
+    color: #fff; margin-top: 2px;
+  }
+  .agent-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  .agent-stat {
+    text-align: center; padding: 8px;
+    background: var(--bg-secondary); border-radius: 6px;
+  }
+  .agent-stat-value { font-size: 16px; font-weight: 600; }
+  .agent-stat-label { font-size: 11px; color: var(--text-muted); }
+  .agent-bio { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  .agent-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .agent-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    background: var(--bg-tertiary); color: var(--text-secondary);
+  }
+  .activity-bar {
+    height: 6px; border-radius: 3px; background: var(--bg-secondary);
+    margin-top: 8px; overflow: hidden;
+  }
+  .activity-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+  /* ── Sentiment Chart ── */
+  .chart-container { position: relative; height: 400px; }
+  .sentiment-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 13px; }
+
+  /* ── Report ── */
+  .report-content {
+    font-size: 15px; line-height: 1.8; max-width: 800px;
+  }
+  .report-content h1 { font-size: 28px; margin: 32px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .report-content h2 { font-size: 22px; margin: 24px 0 12px; color: var(--accent); }
+  .report-content h3 { font-size: 18px; margin: 20px 0 8px; }
+  .report-content p { margin-bottom: 12px; }
+  .report-content ul, .report-content ol { margin: 8px 0 16px 24px; }
+  .report-content li { margin-bottom: 4px; }
+  .report-content blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 8px 16px; margin: 12px 0;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border-radius: 0 6px 6px 0;
+  }
+  .report-content code {
+    background: var(--bg-tertiary); padding: 2px 6px;
+    border-radius: 4px; font-size: 13px;
+  }
+  .report-content strong { color: var(--text-primary); }
+
+  /* ── Chat History ── */
+  .chat-sessions { display: flex; flex-direction: column; gap: 20px; }
+  .chat-session-header {
+    font-size: 15px; font-weight: 600;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .chat-messages { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; }
+  .chat-msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 14px; }
+  .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .chat-msg.agent { align-self: flex-start; background: var(--bg-tertiary); border-bottom-left-radius: 4px; }
+  .chat-msg .sender { font-size: 11px; font-weight: 600; margin-bottom: 2px; opacity: 0.7; }
+
+  /* ── Utilities ── */
+  .badge {
+    display: inline-block; font-size: 11px;
+    padding: 2px 8px; border-radius: 10px;
+    font-weight: 500;
+  }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+  .badge-orange { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .agents-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-brand">
+    <span>🐟</span>
+    <div>
+      <h1>SwarmFish</h1>
+      <div style="font-size:12px;color:var(--text-muted)" id="scenario-name"></div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div class="stat">Agents: <strong id="stat-agents">0</strong></div>
+    <div class="stat">Rounds: <strong id="stat-rounds">0</strong></div>
+    <div class="stat">Actions: <strong id="stat-actions">0</strong></div>
+    <div class="stat">Entities: <strong id="stat-entities">0</strong></div>
+    <div class="stat">Relationships: <strong id="stat-relationships">0</strong></div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="graph">Graph</div>
+  <div class="tab" data-tab="simulation">Simulation</div>
+  <div class="tab" data-tab="agents">Agents</div>
+  <div class="tab" data-tab="sentiment">Sentiment</div>
+  <div class="tab" data-tab="report">Report</div>
+  <div class="tab" data-tab="chat">Chat History</div>
+</div>
+
+<!-- Tab Contents -->
+<div class="content">
+
+  <!-- GRAPH TAB -->
+  <div class="tab-content active" id="tab-graph">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Entity Relationship Graph</div>
+        <div class="card-subtitle" id="graph-subtitle"></div>
+      </div>
+      <div id="graph-container">
+        <svg id="graph-svg"></svg>
+        <div class="graph-legend" id="graph-legend"></div>
+        <div class="node-tooltip" id="node-tooltip"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIMULATION TAB -->
+  <div class="tab-content" id="tab-simulation">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Simulation Timeline</div>
+        <div class="card-subtitle" id="sim-subtitle"></div>
+      </div>
+      <div class="timeline" id="simulation-timeline"></div>
+    </div>
+  </div>
+
+  <!-- AGENTS TAB -->
+  <div class="tab-content" id="tab-agents">
+    <div class="agents-grid" id="agents-grid"></div>
+  </div>
+
+  <!-- SENTIMENT TAB -->
+  <div class="tab-content" id="tab-sentiment">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Sentiment Evolution</div>
+        <div class="card-subtitle">How agent opinions shifted across rounds</div>
+      </div>
+      <div class="chart-container"><canvas id="sentiment-chart"></canvas></div>
+      <div class="sentiment-legend" id="sentiment-legend"></div>
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px">Alliance Map</div>
+        <div id="alliances-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px">Conflict Map</div>
+        <div id="conflicts-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORT TAB -->
+  <div class="tab-content" id="tab-report">
+    <div class="card">
+      <div class="report-content" id="report-content">
+        <div class="empty-state">No report generated yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT HISTORY TAB -->
+  <div class="tab-content" id="tab-chat">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Agent Interview History</div>
+      <div class="chat-sessions" id="chat-sessions">
+        <div class="empty-state">No chat sessions recorded.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// DATA INJECTION POINT
+// The skill replaces these with actual simulation data
+// ============================================================
+const DATA = {{SIMULATION_DATA_JSON}};
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initHeader();
+  initTabs();
+  initGraph();
+  initSimulationTimeline();
+  initAgents();
+  initSentimentChart();
+  initReport();
+  initChatHistory();
+});
+
+function initHeader() {
+  document.getElementById('scenario-name').textContent = DATA.meta?.scenario_name || 'Unnamed Scenario';
+  document.getElementById('stat-agents').textContent = DATA.personas ? Object.keys(DATA.personas).length : 0;
+  document.getElementById('stat-rounds').textContent = DATA.summaries?.length || 0;
+  document.getElementById('stat-actions').textContent = DATA.actions?.length || 0;
+  document.getElementById('stat-entities').textContent = DATA.entities?.entities?.length || 0;
+  document.getElementById('stat-relationships').textContent = DATA.entities?.relationships?.length || 0;
+  document.title = `SwarmFish — ${DATA.meta?.scenario_name || 'Simulation'}`;
+}
+
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+    });
+  });
+}
+
+// ============================================================
+// GRAPH VISUALIZATION (D3.js Force-Directed)
+// ============================================================
+function initGraph() {
+  const entities = DATA.entities?.entities || [];
+  const relationships = DATA.entities?.relationships || [];
+  if (!entities.length) return;
+
+  const container = document.getElementById('graph-container');
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  const svg = d3.select('#graph-svg');
+
+  document.getElementById('graph-subtitle').textContent =
+    `${entities.length} entities, ${relationships.length} relationships`;
+
+  // Build color map from entity types
+  const typeColors = {};
+  (DATA.config?.entity_types || []).forEach(t => { typeColors[t.name] = t.color; });
+  const defaultColors = ['#4A90D9','#7B68EE','#E74C3C','#F39C12','#2ECC71','#95A5A6','#E67E22','#9B59B6','#1ABC9C','#C0392B'];
+  entities.forEach((e, i) => {
+    if (!typeColors[e.type]) typeColors[e.type] = defaultColors[i % defaultColors.length];
+  });
+
+  // Build legend
+  const legendEl = document.getElementById('graph-legend');
+  const types = [...new Set(entities.map(e => e.type))];
+  legendEl.innerHTML = types.map(t =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${typeColors[t]||'#888'}"></div>${t}</div>`
+  ).join('');
+
+  // Build nodes and links
+  const nodes = entities.map(e => ({ ...e, radius: e.importance === 'high' ? 20 : e.importance === 'medium' ? 14 : 10 }));
+  const nodeMap = {};
+  nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  const links = relationships
+    .filter(r => nodeMap[r.source] && nodeMap[r.target])
+    .map(r => ({ ...r, source: r.source, target: r.target }));
+
+  const relColors = {};
+  (DATA.config?.relationship_types || []).forEach(t => { relColors[t.name] = t.color; });
+
+  // Setup SVG groups
+  const g = svg.append('g');
+  const zoom = d3.zoom().scaleExtent([0.2, 4]).on('zoom', e => g.attr('transform', e.transform));
+  svg.call(zoom);
+
+  // Arrow markers
+  svg.append('defs').selectAll('marker')
+    .data(['arrow']).enter().append('marker')
+    .attr('id', 'arrow').attr('viewBox', '0 0 10 10')
+    .attr('refX', 20).attr('refY', 5)
+    .attr('markerWidth', 6).attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path').attr('d', 'M0,0L10,5L0,10').attr('fill', '#555');
+
+  // Links
+  const link = g.append('g').selectAll('line').data(links).enter().append('line')
+    .attr('stroke', d => relColors[d.type] || '#555')
+    .attr('stroke-width', d => d.strength === 'strong' ? 2.5 : d.strength === 'moderate' ? 1.5 : 1)
+    .attr('stroke-opacity', 0.6)
+    .attr('marker-end', 'url(#arrow)');
+
+  // Link labels
+  const linkLabel = g.append('g').selectAll('text').data(links).enter().append('text')
+    .text(d => d.type)
+    .attr('font-size', 9).attr('fill', '#666').attr('text-anchor', 'middle');
+
+  // Nodes
+  const node = g.append('g').selectAll('g').data(nodes).enter().append('g')
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  node.append('circle')
+    .attr('r', d => d.radius)
+    .attr('fill', d => typeColors[d.type] || '#888')
+    .attr('stroke', '#fff').attr('stroke-width', 1.5)
+    .style('cursor', 'pointer');
+
+  node.append('text')
+    .text(d => d.name.length > 16 ? d.name.slice(0,14) + '..' : d.name)
+    .attr('dy', d => d.radius + 14)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', 11).attr('fill', 'var(--text-secondary)');
+
+  // Tooltip
+  const tooltip = document.getElementById('node-tooltip');
+  node.on('mouseover', (e, d) => {
+    tooltip.innerHTML = `<h4>${d.name}</h4><div class="type-badge">${d.type}</div><p>${d.description || ''}</p>` +
+      (d.stance ? `<p style="margin-top:6px;font-style:italic">"${d.stance}"</p>` : '');
+    tooltip.style.display = 'block';
+  })
+  .on('mousemove', e => {
+    tooltip.style.left = (e.offsetX + 16) + 'px';
+    tooltip.style.top = (e.offsetY - 10) + 'px';
+  })
+  .on('mouseout', () => { tooltip.style.display = 'none'; });
+
+  // Force simulation
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(120))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(d => d.radius + 10))
+    .on('tick', () => {
+      link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+          .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      linkLabel.attr('x', d => (d.source.x + d.target.x) / 2)
+               .attr('y', d => (d.source.y + d.target.y) / 2);
+      node.attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+
+  // Center view
+  setTimeout(() => svg.call(zoom.transform, d3.zoomIdentity.translate(0, 0).scale(0.9)), 1000);
+}
+
+// ============================================================
+// SIMULATION TIMELINE
+// ============================================================
+function initSimulationTimeline() {
+  const summaries = DATA.summaries || [];
+  const actions = DATA.actions || [];
+  const container = document.getElementById('simulation-timeline');
+  if (!summaries.length && !actions.length) {
+    container.innerHTML = '<div class="empty-state">No simulation data yet.</div>';
+    return;
+  }
+
+  document.getElementById('sim-subtitle').textContent =
+    `${summaries.length} rounds, ${actions.length} total actions`;
+
+  // Build color map for agents
+  const agentColors = {};
+  const palette = ['#4A90D9','#E74C3C','#2ECC71','#F39C12','#9B59B6','#1ABC9C','#E67E22','#C0392B','#3498DB','#7B68EE'];
+  Object.values(DATA.personas || {}).forEach((p, i) => { agentColors[p.agent_id || p.name] = palette[i % palette.length]; });
+
+  // Group actions by round
+  const roundActions = {};
+  actions.forEach(a => {
+    const r = a.round || 0;
+    if (!roundActions[r]) roundActions[r] = [];
+    roundActions[r].push(a);
+  });
+
+  let html = '';
+  summaries.forEach((s, i) => {
+    const roundNum = s.round || (i + 1);
+    const roundActs = roundActions[roundNum] || [];
+    html += `<div class="timeline-round">
+      <div class="round-header">Round ${roundNum}${s.headline ? ' — ' + s.headline : ''}</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">${s.narrative ? s.narrative.split('\n')[0] : ''}</div>
+      <div class="round-actions">
+        ${roundActs.slice(0, 10).map(a => {
+          const name = a.agent_name || a.agent_id || 'Unknown';
+          const color = agentColors[a.agent_id] || agentColors[name] || '#888';
+          const initial = name.charAt(0).toUpperCase();
+          const action = a.action || {};
+          return `<div class="action-card">
+            <div class="action-avatar" style="background:${color}">${initial}</div>
+            <div class="action-body">
+              <div class="action-meta">
+                <span class="action-agent">${name}</span>
+                <span class="action-type">${action.type || 'unknown'}</span>
+              </div>
+              <div class="action-content">${(action.content || '').slice(0, 200)}${(action.content || '').length > 200 ? '...' : ''}</div>
+              ${action.in_reply_to ? `<div class="action-target">↩ replying to action ${action.in_reply_to}</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+        ${roundActs.length > 10 ? `<div style="font-size:12px;color:var(--text-muted);padding:4px 14px">+ ${roundActs.length - 10} more actions</div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+// ============================================================
+// AGENTS TAB
+// ============================================================
+function initAgents() {
+  const personas = DATA.personas || {};
+  const grid = document.getElementById('agents-grid');
+  if (!Object.keys(personas).length) {
+    grid.innerHTML = '<div class="empty-state">No agents generated yet.</div>';
+    return;
+  }
+
+  const actions = DATA.actions || [];
+  // Count actions per agent
+  const actionCounts = {};
+  actions.forEach(a => {
+    const id = a.agent_id || a.agent_name;
+    actionCounts[id] = (actionCounts[id] || 0) + 1;
+  });
+
+  const typeColors = {};
+  (DATA.config?.entity_types || []).forEach(t => { typeColors[t.name] = t.color; });
+
+  grid.innerHTML = Object.values(personas).map(p => {
+    const persona = p.persona || {};
+    const behavior = p.behavior || {};
+    const color = typeColors[p.type] || '#888';
+    const initial = (p.name || '?').charAt(0).toUpperCase();
+    const actCount = actionCounts[p.agent_id] || actionCounts[p.name] || 0;
+    const actLevel = behavior.activity_level || 0;
+    const sentiment = behavior.sentiment_baseline || 0;
+    const sentLabel = sentiment > 0.3 ? 'Positive' : sentiment < -0.3 ? 'Negative' : 'Neutral';
+    const sentClass = sentiment > 0.3 ? 'badge-green' : sentiment < -0.3 ? 'badge-red' : 'badge-orange';
+
+    return `<div class="card agent-card">
+      <div class="agent-header">
+        <div class="agent-avatar-lg" style="background:${color}">${initial}</div>
+        <div>
+          <div class="agent-name">${p.name}</div>
+          <div class="agent-type-badge" style="background:${color}">${p.type}</div>
+        </div>
+      </div>
+      <div class="agent-stats">
+        <div class="agent-stat">
+          <div class="agent-stat-value">${actCount}</div>
+          <div class="agent-stat-label">Actions</div>
+        </div>
+        <div class="agent-stat">
+          <div class="agent-stat-value badge ${sentClass}" style="font-size:12px">${sentLabel}</div>
+          <div class="agent-stat-label">Sentiment</div>
+        </div>
+        <div class="agent-stat">
+          <div class="agent-stat-value">${Math.round(actLevel * 100)}%</div>
+          <div class="agent-stat-label">Activity</div>
+        </div>
+      </div>
+      <div class="agent-bio">${persona.background || 'No background available.'}</div>
+      <div class="agent-tags">
+        ${persona.personality?.mbti ? `<span class="agent-tag">${persona.personality.mbti}</span>` : ''}
+        ${(persona.personality?.traits || []).slice(0, 3).map(t => `<span class="agent-tag">${t}</span>`).join('')}
+        ${behavior.engagement_style ? `<span class="agent-tag">${behavior.engagement_style}</span>` : ''}
+      </div>
+      <div class="activity-bar">
+        <div class="activity-bar-fill" style="width:${actLevel * 100}%;background:${color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// SENTIMENT CHART
+// ============================================================
+function initSentimentChart() {
+  const summaries = DATA.summaries || [];
+  const personas = DATA.personas || {};
+  if (!summaries.length) return;
+
+  const labels = summaries.map((s, i) => `Round ${s.round || i + 1}`);
+  const palette = ['#4A90D9','#E74C3C','#2ECC71','#F39C12','#9B59B6','#1ABC9C','#E67E22','#C0392B','#3498DB','#7B68EE'];
+  const datasets = [];
+  const agentIds = Object.keys(personas);
+
+  agentIds.forEach((id, idx) => {
+    const p = personas[id];
+    const sentiments = summaries.map(s => {
+      const sm = s.sentiment_map || {};
+      const entry = sm[p.name] || sm[id];
+      return entry ? entry.sentiment : null;
+    });
+    // Only include if we have at least some sentiment data
+    if (sentiments.some(s => s !== null)) {
+      datasets.push({
+        label: p.name,
+        data: sentiments,
+        borderColor: palette[idx % palette.length],
+        backgroundColor: palette[idx % palette.length] + '20',
+        tension: 0.3,
+        pointRadius: 4,
+        spanGaps: true
+      });
+    }
+  });
+
+  if (!datasets.length) {
+    document.getElementById('tab-sentiment').querySelector('.card').innerHTML =
+      '<div class="empty-state">No sentiment data available.</div>';
+    return;
+  }
+
+  new Chart(document.getElementById('sentiment-chart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min: -1, max: 1, title: { display: true, text: 'Sentiment', color: '#8b949e' },
+             grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
+        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+      },
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { color: '#e6edf3', usePointStyle: true } },
+        tooltip: { mode: 'index', intersect: false }
+      }
+    }
+  });
+
+  // Alliance and conflict maps
+  const lastSummary = summaries[summaries.length - 1];
+  const alliancesEl = document.getElementById('alliances-list');
+  const conflictsEl = document.getElementById('conflicts-list');
+
+  if (lastSummary?.alliances?.length) {
+    alliancesEl.innerHTML = lastSummary.alliances.map(a =>
+      `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <strong>${(a.agents || []).join(' + ')}</strong>
+        <div style="color:var(--text-secondary);margin-top:2px">${a.basis || ''}</div>
+      </div>`
+    ).join('');
+  } else { alliancesEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px">No alliances detected.</div>'; }
+
+  if (lastSummary?.conflicts?.length) {
+    conflictsEl.innerHTML = lastSummary.conflicts.map(c =>
+      `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <strong>${(c.agents || []).join(' vs ')}</strong>
+        <div style="color:var(--text-secondary);margin-top:2px">${c.basis || ''}</div>
+      </div>`
+    ).join('');
+  } else { conflictsEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px">No conflicts detected.</div>'; }
+}
+
+// ============================================================
+// REPORT TAB
+// ============================================================
+function initReport() {
+  const reportMd = DATA.report || '';
+  if (!reportMd) return;
+  document.getElementById('report-content').innerHTML = marked.parse(reportMd);
+}
+
+// ============================================================
+// CHAT HISTORY TAB
+// ============================================================
+function initChatHistory() {
+  const chats = DATA.chat_history || [];
+  if (!chats.length) return;
+
+  const container = document.getElementById('chat-sessions');
+  container.innerHTML = chats.map(session => `
+    <div>
+      <div class="chat-session-header">${session.agent_name || 'Unknown Agent'}</div>
+      <div class="chat-messages">
+        ${(session.messages || []).map(m => `
+          <div class="chat-msg ${m.role}">
+            <div class="sender">${m.role === 'user' ? 'You' : session.agent_name}</div>
+            ${m.content}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "swarmfish",
+  "owner": {
+    "name": "Sabir Salah",
+    "url": "https://github.com/sabirsalah"
+  },
+  "plugins": [
+    {
+      "name": "swarmfish",
+      "source": ".",
+      "description": "Multi-agent swarm intelligence engine for Claude Code. Predict outcomes by simulating diverse stakeholder interactions.",
+      "version": "0.1.0"
+    }
+  ]
+}
