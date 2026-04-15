@@ -4,10 +4,10 @@
   "description": "Multi-agent swarm intelligence engine. Simulate how diverse stakeholders react to scenarios and predict outcomes using knowledge graphs, agent personas, and interactive dashboards.",
   "author": {
     "name": "Sabir Salah",
-    "url": "https://github.com/sabirsalah"
+    "url": "https://github.com/sabirmgd"
   },
-  "homepage": "https://github.com/sabirsalah/swarmfish",
-  "repository": "https://github.com/sabirsalah/swarmfish",
+  "homepage": "https://github.com/sabirmgd/swarmfish",
+  "repository": "https://github.com/sabirmgd/swarmfish",
   "license": "MIT",
   "keywords": [
     "swarm-intelligence",

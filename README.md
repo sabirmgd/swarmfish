@@ -10,7 +10,7 @@ Inspired by [MiroFish](https://github.com/666ghj/MiroFish) — reimagined as a C
 
 ```bash
 # Add the marketplace
-/plugin marketplace add sabirsalah/swarmfish
+/plugin marketplace add sabirmgd/swarmfish
 
 # Install the plugin
 /plugin install swarmfish@swarmfish
@@ -21,7 +21,7 @@ Inspired by [MiroFish](https://github.com/666ghj/MiroFish) — reimagined as a C
 
 **Or test locally:**
 ```bash
-git clone https://github.com/sabirsalah/swarmfish.git
+git clone https://github.com/sabirmgd/swarmfish.git
 claude --plugin-dir ./swarmfish
 ```
 

@@ -259,9 +259,62 @@
   .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  /* ── Simulation Filters ── */
+  .sim-filters {
+    display: flex; gap: 12px; align-items: center;
+    margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .sim-filters input[type="text"],
+  .sim-filters select {
+    padding: 8px 12px;
+    font-size: 13px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .sim-filters input[type="text"]:focus,
+  .sim-filters select:focus {
+    border-color: var(--accent);
+  }
+  .sim-filters input[type="text"] { flex: 1; min-width: 200px; }
+  .sim-filters select { min-width: 160px; }
+  .show-more-btn {
+    display: block; margin: 16px auto; padding: 10px 28px;
+    font-size: 13px; font-weight: 500;
+    background: var(--bg-tertiary); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: background 0.2s;
+  }
+  .show-more-btn:hover { background: var(--border); }
+
   @media (max-width: 768px) {
     .grid-2 { grid-template-columns: 1fr; }
     .agents-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Print Styles ── */
+  @media print {
+    body { background: #fff; color: #000; }
+    .header, .tabs { display: none !important; }
+    .tab-content { display: none !important; }
+    .tab-content.active { display: block !important; }
+    .content { padding: 0; max-width: 100%; }
+    .card {
+      background: #fff; border: 1px solid #ccc;
+      box-shadow: none; break-inside: avoid;
+    }
+    .card-title, .card-subtitle, .round-header { color: #000; }
+    .action-card { background: #f5f5f5; border-color: #ccc; }
+    .action-content, .agent-bio, .report-content,
+    .chat-msg, .action-target { color: #333; }
+    .action-agent { color: #000; }
+    .sim-filters, .show-more-btn { display: none !important; }
+    #graph-container { border-color: #ccc; }
+    .report-content h2 { color: #333; }
+    a { color: #000; text-decoration: underline; }
   }
 </style>
 </head>
@@ -320,7 +373,12 @@
         <div class="card-title">Simulation Timeline</div>
         <div class="card-subtitle" id="sim-subtitle"></div>
       </div>
+      <div class="sim-filters">
+        <input type="text" id="sim-search" placeholder="Search actions by text...">
+        <select id="sim-agent-filter"><option value="">All Agents</option></select>
+      </div>
       <div class="timeline" id="simulation-timeline"></div>
+      <button class="show-more-btn" id="sim-show-more" style="display:none">Show more</button>
     </div>
   </div>
 
@@ -539,60 +597,131 @@ function initGraph() {
 // ============================================================
 function initSimulationTimeline() {
   const summaries = DATA.summaries || [];
-  const actions = DATA.actions || [];
+  const allActions = DATA.actions || [];
   const container = document.getElementById('simulation-timeline');
-  if (!summaries.length && !actions.length) {
+  const showMoreBtn = document.getElementById('sim-show-more');
+  if (!summaries.length && !allActions.length) {
     container.innerHTML = '<div class="empty-state">No simulation data yet.</div>';
     return;
   }
 
   document.getElementById('sim-subtitle').textContent =
-    `${summaries.length} rounds, ${actions.length} total actions`;
+    `${summaries.length} rounds, ${allActions.length} total actions`;
 
   // Build color map for agents
   const agentColors = {};
   const palette = ['#4A90D9','#E74C3C','#2ECC71','#F39C12','#9B59B6','#1ABC9C','#E67E22','#C0392B','#3498DB','#7B68EE'];
-  Object.values(DATA.personas || {}).forEach((p, i) => { agentColors[p.agent_id || p.name] = palette[i % palette.length]; });
-
-  // Group actions by round
-  const roundActions = {};
-  actions.forEach(a => {
-    const r = a.round || 0;
-    if (!roundActions[r]) roundActions[r] = [];
-    roundActions[r].push(a);
+  const agentNames = new Set();
+  Object.values(DATA.personas || {}).forEach((p, i) => {
+    agentColors[p.agent_id || p.name] = palette[i % palette.length];
+    agentNames.add(p.name);
   });
 
-  let html = '';
-  summaries.forEach((s, i) => {
-    const roundNum = s.round || (i + 1);
-    const roundActs = roundActions[roundNum] || [];
-    html += `<div class="timeline-round">
-      <div class="round-header">Round ${roundNum}${s.headline ? ' — ' + s.headline : ''}</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">${s.narrative ? s.narrative.split('\n')[0] : ''}</div>
-      <div class="round-actions">
-        ${roundActs.slice(0, 10).map(a => {
-          const name = a.agent_name || a.agent_id || 'Unknown';
-          const color = agentColors[a.agent_id] || agentColors[name] || '#888';
-          const initial = name.charAt(0).toUpperCase();
-          const action = a.action || {};
-          return `<div class="action-card">
-            <div class="action-avatar" style="background:${color}">${initial}</div>
-            <div class="action-body">
-              <div class="action-meta">
-                <span class="action-agent">${name}</span>
-                <span class="action-type">${action.type || 'unknown'}</span>
+  // Populate agent filter dropdown
+  const agentSelect = document.getElementById('sim-agent-filter');
+  agentNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    agentSelect.appendChild(opt);
+  });
+
+  const ACTIONS_PER_PAGE = 50;
+  let visibleCount = ACTIONS_PER_PAGE;
+
+  function renderTimeline() {
+    const searchText = (document.getElementById('sim-search').value || '').toLowerCase();
+    const agentFilter = agentSelect.value;
+
+    // Filter actions
+    const filtered = allActions.filter(a => {
+      const name = a.agent_name || a.agent_id || '';
+      const content = (a.action?.content || '').toLowerCase();
+      const matchesAgent = !agentFilter || name === agentFilter;
+      const matchesSearch = !searchText || content.includes(searchText) || name.toLowerCase().includes(searchText);
+      return matchesAgent && matchesSearch;
+    });
+
+    // Group filtered actions by round
+    const roundActions = {};
+    filtered.forEach(a => {
+      const r = a.round || 0;
+      if (!roundActions[r]) roundActions[r] = [];
+      roundActions[r].push(a);
+    });
+
+    // Flatten to count total visible across rounds
+    let totalRendered = 0;
+    let html = '';
+
+    for (let i = 0; i < summaries.length; i++) {
+      const s = summaries[i];
+      const roundNum = s.round || (i + 1);
+      const roundActs = roundActions[roundNum] || [];
+      if (!roundActs.length && (searchText || agentFilter)) continue; // skip empty rounds when filtering
+
+      const remaining = visibleCount - totalRendered;
+      if (remaining <= 0) break;
+      const toShow = roundActs.slice(0, remaining);
+      totalRendered += toShow.length;
+
+      html += `<div class="timeline-round">
+        <div class="round-header">Round ${roundNum}${s.headline ? ' — ' + s.headline : ''}</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">${s.narrative ? s.narrative.split('\n')[0] : ''}</div>
+        <div class="round-actions">
+          ${toShow.map(a => {
+            const name = a.agent_name || a.agent_id || 'Unknown';
+            const color = agentColors[a.agent_id] || agentColors[name] || '#888';
+            const initial = name.charAt(0).toUpperCase();
+            const action = a.action || {};
+            return `<div class="action-card">
+              <div class="action-avatar" style="background:${color}">${initial}</div>
+              <div class="action-body">
+                <div class="action-meta">
+                  <span class="action-agent">${name}</span>
+                  <span class="action-type">${action.type || 'unknown'}</span>
+                </div>
+                <div class="action-content">${(action.content || '').slice(0, 200)}${(action.content || '').length > 200 ? '...' : ''}</div>
+                ${action.in_reply_to ? `<div class="action-target">↩ replying to action ${action.in_reply_to}</div>` : ''}
               </div>
-              <div class="action-content">${(action.content || '').slice(0, 200)}${(action.content || '').length > 200 ? '...' : ''}</div>
-              ${action.in_reply_to ? `<div class="action-target">↩ replying to action ${action.in_reply_to}</div>` : ''}
-            </div>
-          </div>`;
-        }).join('')}
-        ${roundActs.length > 10 ? `<div style="font-size:12px;color:var(--text-muted);padding:4px 14px">+ ${roundActs.length - 10} more actions</div>` : ''}
-      </div>
-    </div>`;
+            </div>`;
+          }).join('')}
+          ${roundActs.length > toShow.length ? `<div style="font-size:12px;color:var(--text-muted);padding:4px 14px">+ ${roundActs.length - toShow.length} more in this round</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    if (!html) {
+      container.innerHTML = '<div class="empty-state">No actions match the current filters.</div>';
+    } else {
+      container.innerHTML = html;
+    }
+
+    // Show/hide "Show more" button
+    if (totalRendered < filtered.length) {
+      showMoreBtn.style.display = 'block';
+      showMoreBtn.textContent = `Show more (${filtered.length - totalRendered} remaining)`;
+    } else {
+      showMoreBtn.style.display = 'none';
+    }
+  }
+
+  // Event listeners for search and filter
+  document.getElementById('sim-search').addEventListener('input', () => {
+    visibleCount = ACTIONS_PER_PAGE;
+    renderTimeline();
+  });
+  agentSelect.addEventListener('change', () => {
+    visibleCount = ACTIONS_PER_PAGE;
+    renderTimeline();
+  });
+  showMoreBtn.addEventListener('click', () => {
+    visibleCount += ACTIONS_PER_PAGE;
+    renderTimeline();
   });
 
-  container.innerHTML = html;
+  // Initial render
+  renderTimeline();
 }
 
 // ============================================================
